@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
-from .models import ClothRoll, DipRun, Loft
-from .rules import can_mark_roll_cured
+from .models import ClothRoll, DipRun, Loft, SystemSetting
+from .rules import LOCK_MSG_STATUS, can_mark_roll_cured, cured_lock_on
 
 
 class LoftSerializer(serializers.ModelSerializer):
@@ -50,6 +50,18 @@ class ClothRollSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"rollCode": "同一帆布间卷号必须唯一"})
 
         new_status = attrs.get("status")
+        if new_status is not None and self.instance is not None:
+            # 固化锁定开启时，已固化卷不得改回原布/浸渍中（取库内最新状态判定）
+            current_status = ClothRoll.objects.filter(pk=self.instance.pk).values_list(
+                "status", flat=True
+            ).first()
+            if (
+                current_status == ClothRoll.STATUS_CURED
+                and new_status != ClothRoll.STATUS_CURED
+                and cured_lock_on()
+            ):
+                raise serializers.ValidationError({"status": LOCK_MSG_STATUS})
+
         if new_status == ClothRoll.STATUS_CURED:
             roll = self.instance
             if roll is None:
@@ -93,3 +105,12 @@ class DipRunSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("id", "rollCode", "loftName", "created_at")
+
+
+class SystemSettingSerializer(serializers.ModelSerializer):
+    curedReadonly = serializers.BooleanField(source="cured_readonly")
+
+    class Meta:
+        model = SystemSetting
+        fields = ("curedReadonly", "updated_at")
+        read_only_fields = ("updated_at",)

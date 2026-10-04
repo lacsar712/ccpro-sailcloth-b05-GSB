@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from .models import ClothRoll, DipRun
+from .models import ClothRoll, DipRun, SystemSetting
 
 MIN_CURE_HOURS_FOR_CURED = Decimal("12")
+
+LOCK_MSG_DIP = "全站固化已锁定：已固化挂签只读，不得再登记浸渍"
+LOCK_MSG_STATUS = "全站固化已锁定：已固化卷不得改回原布或浸渍中"
+
+
+def cured_lock_on() -> bool:
+    return SystemSetting.get().cured_readonly
 
 
 def latest_dip_run(roll: ClothRoll) -> DipRun | None:

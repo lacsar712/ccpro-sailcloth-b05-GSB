@@ -406,3 +406,24 @@ th { background: var(--canvas-deep); color: var(--navy); }
   .layout { grid-template-columns: 1fr; }
   .content { padding: 18px 16px; }
 }
+
+/* 固化锁定：已固化卷只读面板 */
+.lock-banner {
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+  background: rgba(196, 163, 90, 0.14);
+  color: var(--navy);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.drawer-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.drawer-fieldset[disabled] {
+  opacity: 0.55;
+}

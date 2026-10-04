@@ -58,3 +58,26 @@ class DipRun(models.Model):
 
     def __str__(self):
         return f"Dip@{self.roll_id} {self.started_at}"
+
+
+class SystemSetting(models.Model):
+    """全站单例设置（pk 恒为 1）。"""
+
+    cured_readonly = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "系统设置"
+        verbose_name_plural = "系统设置"
+
+    def __str__(self):
+        return f"固化只读锁定：{'开' if self.cured_readonly else '关'}"
+
+    @classmethod
+    def get(cls):
+        setting, _ = cls.objects.get_or_create(pk=1)
+        return setting
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)

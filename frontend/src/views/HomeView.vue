@@ -5,6 +5,7 @@ import api from '../api'
 const lofts = ref([])
 const rolls = ref([])
 const dips = ref([])
+const curedReadonly = ref(false)
 const error = ref('')
 const panelError = ref('')
 const selectedId = ref(null)
@@ -27,6 +28,11 @@ function localNow() {
 
 const selected = computed(() => rolls.value.find((r) => r.id === selectedId.value) || null)
 
+// 锁开且当前卷已固化时，右侧面板进入只读（服务端亦强制拦截）
+const curedLocked = computed(
+  () => curedReadonly.value && selected.value?.status === 'cured'
+)
+
 const rollsByLoft = computed(() => {
   return lofts.value.map((loft) => ({
     loft,
@@ -44,14 +50,16 @@ const recentFeed = computed(() => dips.value.slice(0, 12))
 async function load() {
   error.value = ''
   try {
-    const [l, r, d] = await Promise.all([
+    const [l, r, d, s] = await Promise.all([
       api.get('/lofts/'),
       api.get('/rolls/'),
       api.get('/dips/'),
+      api.get('/settings/cure-lock/'),
     ])
     lofts.value = l.data.results || l.data
     rolls.value = r.data.results || r.data
     dips.value = d.data.results || d.data
+    curedReadonly.value = !!s.data.curedReadonly
   } catch {
     error.value = '晾晒架加载失败'
   }
@@ -73,6 +81,10 @@ function closePanel() {
 
 async function setStatus(status) {
   if (!selected.value) return
+  if (curedLocked.value && status !== 'cured') {
+    panelError.value = '全站固化已锁定：已固化卷不得改回原布或浸渍中'
+    return
+  }
   panelError.value = ''
   panelBusy.value = true
   try {
@@ -91,6 +103,10 @@ async function setStatus(status) {
 
 async function logDip() {
   if (!selected.value) return
+  if (curedLocked.value) {
+    panelError.value = '全站固化已锁定：已固化挂签只读，不得再登记浸渍'
+    return
+  }
   panelError.value = ''
   panelBusy.value = true
   try {
@@ -213,11 +229,15 @@ onMounted(load)
       <p v-if="selected.notes" class="hint">{{ selected.notes }}</p>
       <p v-if="panelError" class="error">{{ panelError }}</p>
 
+      <div v-if="curedLocked" class="lock-banner">
+        全站固化已锁定：该卷挂签只读，不得登记浸渍或改回浸渍中/原布。
+      </div>
+
       <div class="drawer-actions">
         <button
           class="btn secondary"
           type="button"
-          :disabled="panelBusy || selected.status === 'raw'"
+          :disabled="panelBusy || curedLocked || selected.status === 'raw'"
           @click="setStatus('raw')"
         >
           标为原布
@@ -225,7 +245,7 @@ onMounted(load)
         <button
           class="btn secondary"
           type="button"
-          :disabled="panelBusy || selected.status === 'dipping'"
+          :disabled="panelBusy || curedLocked || selected.status === 'dipping'"
           @click="setStatus('dipping')"
         >
           标为浸渍中
@@ -242,6 +262,7 @@ onMounted(load)
 
       <form class="drawer-form" @submit.prevent="logDip">
         <h3>登记浸渍</h3>
+        <fieldset :disabled="curedLocked" class="drawer-fieldset">
         <label>开始时间
           <input v-model="dipForm.startedAt" type="datetime-local" required />
         </label>
@@ -255,6 +276,7 @@ onMounted(load)
           <input v-model="dipForm.notes" />
         </label>
         <button class="btn" type="submit" :disabled="panelBusy">写入浸渍记录</button>
+        </fieldset>
       </form>
 
       <div class="drawer-history">
