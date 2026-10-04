@@ -46,9 +46,12 @@ docker compose up --build
 
 - **登录** → 进入主工作面
 - **`/` 帆布间晾晒架（主）**：按帆布间挂布卷芯片（挂签状态 `raw` / `dipping` / `cured`）；点击打开右侧面板登记 `DipRun`、切换固化状态；架下为浸渍流水次要信息流
+- **`/cure-lock` 固化锁定**：管理员可切换全站「已固化挂签只读」并保存（持久化，刷新仍有效）；操作工进入只能查看开关
 - **`/rolls` · `/dips`（次要台账）**：保留列表/表单 CRUD，侧栏降级为「台账」入口，非主路径
 
-API 契约不变（JWT、`/api/lofts|rolls|dips|dashboard/`）。
+开启「已固化挂签只读」后，已固化卷在右侧面板不能再登记浸渍，也不能改回浸渍中/原布（服务端事务内行锁强制，两笔并发登记同卷会同时被挡）；原布与浸渍中操作照旧。
+
+API 契约不变（JWT、`/api/lofts|rolls|dips|dashboard/`），新增 `GET/PATCH /api/cure-lock/`：登录可读，仅 `role=admin` 可写。
 
 ## 配色
 

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from .models import ClothRoll, DipRun, Loft
-from .rules import can_mark_roll_cured
+from .rules import can_change_roll_status, can_log_dip_for_roll, can_mark_roll_cured
 
 
 class LoftSerializer(serializers.ModelSerializer):
@@ -60,6 +60,10 @@ class ClothRollSerializer(serializers.ModelSerializer):
             ok, msg = can_mark_roll_cured(roll)
             if not ok:
                 raise serializers.ValidationError({"status": msg})
+        if self.instance is not None and new_status is not None:
+            ok, msg = can_change_roll_status(self.instance, new_status)
+            if not ok:
+                raise serializers.ValidationError({"status": msg})
         return attrs
 
 
@@ -93,3 +97,11 @@ class DipRunSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("id", "rollCode", "loftName", "created_at")
+
+    def validate(self, attrs):
+        roll = attrs.get("roll")
+        if roll is not None:
+            ok, msg = can_log_dip_for_roll(roll)
+            if not ok:
+                raise serializers.ValidationError({"rollId": msg})
+        return attrs

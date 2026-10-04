@@ -5,6 +5,7 @@ import api from '../api'
 const lofts = ref([])
 const rolls = ref([])
 const dips = ref([])
+const cureLocked = ref(false)
 const error = ref('')
 const panelError = ref('')
 const selectedId = ref(null)
@@ -27,6 +28,10 @@ function localNow() {
 
 const selected = computed(() => rolls.value.find((r) => r.id === selectedId.value) || null)
 
+const curedReadonly = computed(
+  () => cureLocked.value && selected.value?.status === 'cured'
+)
+
 const rollsByLoft = computed(() => {
   return lofts.value.map((loft) => ({
     loft,
@@ -44,14 +49,16 @@ const recentFeed = computed(() => dips.value.slice(0, 12))
 async function load() {
   error.value = ''
   try {
-    const [l, r, d] = await Promise.all([
+    const [l, r, d, lock] = await Promise.all([
       api.get('/lofts/'),
       api.get('/rolls/'),
       api.get('/dips/'),
+      api.get('/cure-lock/'),
     ])
     lofts.value = l.data.results || l.data
     rolls.value = r.data.results || r.data
     dips.value = d.data.results || d.data
+    cureLocked.value = !!lock.data.locked
   } catch {
     error.value = '晾晒架加载失败'
   }
@@ -82,6 +89,7 @@ async function setStatus(status) {
     const data = e.response?.data
     panelError.value =
       data?.status?.[0] ||
+      data?.rollId?.[0] ||
       data?.detail ||
       '状态更新失败（标「已固化」需最近浸渍固化时长 ≥ 12 小时）'
   } finally {
@@ -117,6 +125,7 @@ async function logDip() {
     await load()
   } catch (e) {
     panelError.value =
+      e.response?.data?.rollId?.[0] ||
       e.response?.data?.detail ||
       JSON.stringify(e.response?.data) ||
       '登记浸渍失败'
@@ -135,7 +144,12 @@ onMounted(load)
         <h1>帆布间晾晒架</h1>
         <p class="sub">按帆布间挂卷；点选布卷登记浸渍或标固化。固化规则：最近浸渍时长 ≥ 12 小时。</p>
       </div>
-      <button class="btn secondary" type="button" @click="load">刷新架面</button>
+      <div class="rack-head-actions">
+        <router-link v-if="cureLocked" class="lock-badge" to="/cure-lock">
+          🔒 已固化挂签只读中
+        </router-link>
+        <button class="btn secondary" type="button" @click="load">刷新架面</button>
+      </div>
     </header>
 
     <p v-if="error" class="error">{{ error }}</p>
@@ -211,13 +225,17 @@ onMounted(load)
         <span class="hint">{{ selected.fabricWeightGsm }} gsm</span>
       </div>
       <p v-if="selected.notes" class="hint">{{ selected.notes }}</p>
-      <p v-if="panelError" class="error">{{ panelError }}</p>
+      <div v-if="panelError" class="error">{{ panelError }}</div>
+
+      <div v-if="curedReadonly" class="lock-notice">
+        全站「已固化挂签只读」已开启：该卷已固化，不能再登记浸渍，也不能改回浸渍中或原布。
+      </div>
 
       <div class="drawer-actions">
         <button
           class="btn secondary"
           type="button"
-          :disabled="panelBusy || selected.status === 'raw'"
+          :disabled="panelBusy || selected.status === 'raw' || curedReadonly"
           @click="setStatus('raw')"
         >
           标为原布
@@ -225,7 +243,7 @@ onMounted(load)
         <button
           class="btn secondary"
           type="button"
-          :disabled="panelBusy || selected.status === 'dipping'"
+          :disabled="panelBusy || selected.status === 'dipping' || curedReadonly"
           @click="setStatus('dipping')"
         >
           标为浸渍中
@@ -242,19 +260,24 @@ onMounted(load)
 
       <form class="drawer-form" @submit.prevent="logDip">
         <h3>登记浸渍</h3>
-        <label>开始时间
-          <input v-model="dipForm.startedAt" type="datetime-local" required />
-        </label>
-        <label>树脂 %
-          <input v-model.number="dipForm.resinPct" type="number" step="0.1" required />
-        </label>
-        <label>固化时长 h（可空）
-          <input v-model="dipForm.cureHours" type="number" step="0.1" />
-        </label>
-        <label>备注
-          <input v-model="dipForm.notes" />
-        </label>
-        <button class="btn" type="submit" :disabled="panelBusy">写入浸渍记录</button>
+        <fieldset
+          class="drawer-fields"
+          :disabled="panelBusy || curedReadonly"
+        >
+          <label>开始时间
+            <input v-model="dipForm.startedAt" type="datetime-local" required />
+          </label>
+          <label>树脂 %
+            <input v-model.number="dipForm.resinPct" type="number" step="0.1" required />
+          </label>
+          <label>固化时长 h（可空）
+            <input v-model="dipForm.cureHours" type="number" step="0.1" />
+          </label>
+          <label>备注
+            <input v-model="dipForm.notes" />
+          </label>
+          <button class="btn" type="submit">写入浸渍记录</button>
+        </fieldset>
       </form>
 
       <div class="drawer-history">

@@ -1,9 +1,10 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import api from '../api'
 
 const dips = ref([])
 const rolls = ref([])
+const cureLocked = ref(false)
 const error = ref('')
 const form = reactive({
   rollId: null,
@@ -22,15 +23,29 @@ function localNow() {
 async function load() {
   error.value = ''
   try {
-    const [d, r] = await Promise.all([api.get('/dips/'), api.get('/rolls/')])
+    const [d, r, lock] = await Promise.all([
+      api.get('/dips/'),
+      api.get('/rolls/'),
+      api.get('/cure-lock/'),
+    ])
     dips.value = d.data.results || d.data
     rolls.value = r.data.results || r.data
-    if (!form.rollId && rolls.value.length) form.rollId = rolls.value[0].id
+    cureLocked.value = !!lock.data.locked
+    const selectable = cureLocked.value
+      ? rolls.value.filter((x) => x.status !== 'cured')
+      : rolls.value
+    if (!selectable.some((x) => x.id === form.rollId)) {
+      form.rollId = selectable.length ? selectable[0].id : null
+    }
     if (!form.startedAt) form.startedAt = localNow()
   } catch {
     error.value = '加载失败'
   }
 }
+
+const selectableRolls = computed(() =>
+  cureLocked.value ? rolls.value.filter((r) => r.status !== 'cured') : rolls.value
+)
 
 async function create() {
   error.value = ''
@@ -48,7 +63,11 @@ async function create() {
     form.startedAt = localNow()
     await load()
   } catch (e) {
-    error.value = e.response?.data?.detail || JSON.stringify(e.response?.data) || '创建失败'
+    error.value =
+      e.response?.data?.rollId?.[0] ||
+      e.response?.data?.detail ||
+      JSON.stringify(e.response?.data) ||
+      '创建失败'
   }
 }
 
@@ -64,7 +83,7 @@ onMounted(load)
     <form class="panel row" @submit.prevent="create">
       <label>布卷
         <select v-model.number="form.rollId" required>
-          <option v-for="r in rolls" :key="r.id" :value="r.id">{{ r.rollCode }} · {{ r.loftName }}</option>
+          <option v-for="r in selectableRolls" :key="r.id" :value="r.id">{{ r.rollCode }} · {{ r.loftName }}</option>
         </select>
       </label>
       <label>开始时间

@@ -402,6 +402,38 @@ th { background: var(--canvas-deep); color: var(--navy); }
 .drawer-form label { min-width: 0; }
 .drawer-form input { min-width: 0; width: 100%; }
 
+.drawer-fields {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.lock-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(196, 163, 90, 0.18);
+  border: 1px solid var(--accent);
+  color: #6b4f12;
+  font-size: 0.9rem;
+}
+.rack-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lock-badge {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--canvas);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }
   .content { padding: 18px 16px; }
